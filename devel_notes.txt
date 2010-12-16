@@ -1,0 +1,22 @@
+Install
+1. create table
+	-memberprice id
+	-option field id
+	-membertype id
+buildForm hook
+1. Get list of membership types
+2. Turn into HTML list to add to edit option form
+3. Add list to edit option form
+4. If an option exists in the table, make sure the correct membership type is selected in list
+		-if that membership type does not exist
+			-add message to form that previously selected membership type does not exist
+			-set the option to None
+			
+postProcess hook
+1. Get option ID
+2. If update
+	do update process
+3. If add
+	do add process
+4. If delete (will have to hook the form where options can be deleted)
+	do delete process
