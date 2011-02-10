@@ -1,0 +1,18 @@
+<?php
+function memberprice_install() {
+    if (!civicrm_initialize()) {
+        drupal_set_message("Unable to initialize CiviCRM for install");
+        return;
+    }
+    //provides civicrm_error handling
+    require_once('api/v2/utils.php');
+    $sql = "CREATE TABLE IF NOT EXISTS civicrm_memberprice (gid int, oid int);";
+    $result = CRM_Core_DAO::executeQuery($sql);
+    if (civicrm_error($result)) {
+      drupal_set_message($result['error_message']);
+    } 
+    else {
+      drupal_set_message('CiviCRM Memberprice Module Installed Successfully');
+    }
+}  
+?>
