@@ -94,7 +94,7 @@ function memberprice_civicrm_buildAmount( $pageType, &$form, &$amount ){
 	$grouplist = array();
 	$isAdmin;
 	foreach($user_groups as $group) {
-	  array_push($grouplist, $group['id']);
+	  array_push($grouplist, $group['group_id']);
 	  if($group['title'] == 'Administrators'){
 	    $isAdmin = 1;
 	  }
@@ -106,7 +106,7 @@ function memberprice_civicrm_buildAmount( $pageType, &$form, &$amount ){
       foreach ($optionList as &$priceOption){
         $acl = getAcl($priceOption['id']);
       	foreach($acl as $ace){
-				  if (!in_array($ace,$user_groups)){
+				  if (!in_array($ace,$grouplist)){
 				      $optionList = array_diff_key($optionList,array($priceOption['id']=>1));
 				  }
       	}
