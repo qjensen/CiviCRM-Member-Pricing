@@ -78,33 +78,28 @@ function memberprice_civicrm_buildAmount( $pageType, &$form, &$amount ){
 	// get the logged in user id
 	$session =& CRM_Core_Session::singleton();
 	$userID  = $session->get( 'userID' );
-	$grouplist = array();
-	
+
 	if(!$userID){
 		$userID = -1;
-		$grouplist[] = -1;
 	}
-	else 
-	{
-  	//get the groups user belongs to
-  	$params = array('contact_id' => $userID);
-  	$user_groups = civicrm_group_contact_get( $params );
-  	if ( civicrm_error ( $user_groups )) {
-  		return $user_groups['error_message'];
-  	}
-  	
-  	//determine if this is an admin user
-  	
-  	$isAdmin;
-  	foreach($user_groups as $group) {
-  	  array_push($grouplist, $group['group_id']);
-  	  if($group['title'] == 'Administrators'){
-  	    $isAdmin = 1;
-  	  }
-  	}
+
+	//get the groups user belongs to
+	$params = array('contact_id' => $userID);
+	$user_groups = civicrm_group_contact_get( $params );
+	if ( civicrm_error ( $user_groups )) {
+		return $user_groups['error_message'];
 	}
 	
-
+	//determine if this is an admin user
+	$grouplist = array();
+	$isAdmin;
+	foreach($user_groups as $group) {
+	  array_push($grouplist, $group['group_id']);
+	  if($group['title'] == 'Administrators'){
+	    $isAdmin = 1;
+	  }
+	}
+	
 	if($userID != 1 && $isAdmin != 1){
     foreach($amount as &$priceSetSettings){
       $optionList = &$priceSetSettings['options'];
@@ -149,6 +144,7 @@ function memberprice_civicrm_buildPriceOptions( &$options ) {
 	
 	//if it is not admin user
 	if($userID != 1 && $isAdmin != 1) {
+    
 		foreach(array_keys($options) as $optionId) {
 			$acl = getAcl($optionId);
 			foreach($acl as $ace){
@@ -165,7 +161,6 @@ function getGroupList(){
 	$grouplist = array();
 	//default first entry in select list
 	$grouplist['00'] = 'Everyone';
-	$grouplist['-1'] = 'Anonymous Only';
 	$myGroups =& civicrm_group_get($params);
 	foreach($myGroups as $group) {
 		$grouplist[$group['id']] = $group['title'];
