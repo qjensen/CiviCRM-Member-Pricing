@@ -117,9 +117,13 @@ function memberprice_civicrm_buildAmount( $pageType, &$form, &$amount ){
       $optionList = &$priceSetSettings['options'];
       foreach ($optionList as &$priceOption){
         $acl = getAcl($priceOption['id']);
+        $match = FALSE; //assume nothing matches
       	foreach($acl as $ace){
-				  if (!in_array($ace,$grouplist)){
+				  if (!in_array($ace,$grouplist) && $match == FALSE){
 				      $optionList = array_diff_key($optionList,array($priceOption['id']=>1));
+				  }
+				  else {
+				    $match = TRUE;
 				  }
       	}
       }
