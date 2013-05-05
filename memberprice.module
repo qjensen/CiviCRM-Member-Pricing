@@ -1,209 +1,256 @@
 <?php
+
 /**
+ * Implements hook_help
  * Display help and module information
- * @param path which path of the site we're displaying help
- * @param arg array that holds the current path as would be returned from arg() function
- * @return help text for the path
+ * 
+ * @param string $path url path that will trigger this help display
+ * @param array $arg the current path as returned from arg() function
+ * @return - help text for the path
  */
-
-function memberprice_help($path, $arg)
-{
-	$output = '';
-	switch ($path)
-	{
-		case "admin/help#memberpice":
-			$output = '<p>'.  t("Adds ability to limit pricing option to members for Events") .'</p>';
-			break;
-	}
-	return $output;
-} // function civichapter_help
-
-function memberprice_perm()
-{
-	return array('access memberprice');
-
-} // function civichapter_perm
-
-function memberprice_civicrm_buildForm( $formName, &$form )
-{
-	civicrm_initialize();
-	require_once('api/v2/Group.php');
-	//only add group list to price option form
-	$action = $form->getVar('_action');
-	if($formName == 'CRM_Price_Form_Option' && $action == CRM_Core_Action::UPDATE){
-		//generate list of memberships to add to form
-		$group_list = getGroupList();
-		//get any acl's that already exist
-		$oid = $form->getElement('optionId')->getValue();
-		//no oid means this price option is being added
-		if($oid){
-		  $groups_selected = getAcl($oid);
-		}
-		// set default values
-		$form->setDefaults(array('groups'=>$groups_selected));
-		$form->add('select','groups','Groups',$group_list);
-		$element = $form->getElement('groups');
-		if(!$oid){
-		  $element->updateAttributes(array('disabled'=>true));
-		}
-		$element->setMultiple(true);
-	}
-}//function memberprice_buildForm
-
-function memberprice_civicrm_postProcess( $formName, &$form ){
-  $action = $form->getVar('_action');
-	if($formName == 'CRM_Price_Form_Option' && $action == CRM_Core_Action::UPDATE){
-		$price_option_id = $form->getElement('optionId')->getValue();
-	  $acl_group_id=$form->getElement('groups')->getValue();
-		if($price_option_id){
-  		//delete any records with this field id first
-  		$delsql = "DELETE FROM civicrm_memberprice WHERE oid= %1";
-  		$delparams=array(1=>array($price_option_id,'Integer'));
-  		CRM_Core_DAO::executeQuery( $delsql, $delparams );
-  		//if the acl is not set to Everyone
-  		if($acl_group_id[0] != '00'){
-  			foreach($acl_group_id as $acl_param){
-  				//insert new records
-  				$sql = "INSERT INTO civicrm_memberprice (gid,oid) VALUES(%1,%2)";
-  				$params=array(1=>array($acl_param,'Integer'),2=>array($price_option_id,'Integer'));
-  				CRM_Core_DAO::executeQuery( $sql, $params );
-  			}
-  		}
-		}
-	}
-}//function memberprice_civicrm_postprocess
-
-function memberprice_civicrm_buildAmount( $pageType, &$form, &$amount ){
-	require_once 'api/v2/GroupContact.php';
-	// get the logged in user id
-	$session =& CRM_Core_Session::singleton();
-	$userID  = $session->get( 'userID' );
-	$grouplist = array();
-	
-	if(!$userID){
-		$userID = -1;
-		$grouplist[] = -1;
-	}
-	else 
-	{
-  	//get the groups user belongs to
-  	$params = array('contact_id' => $userID);
-  	$user_groups = civicrm_group_contact_get( $params );
-  	if ( civicrm_error ( $user_groups )) {
-  		return $user_groups['error_message'];
-  	}
-  	
-  	//determine if this is an admin user
-  	
-  	$isAdmin;
-  	foreach($user_groups as $group) {
-  	  array_push($grouplist, $group['group_id']);
-  	  if($group['title'] == 'Administrators'){
-  	    $isAdmin = 1;
-  	  }
-  	}
-	}
-	
-	//if contact doesn't belong to any groups
-	//they get non-member prices. This is 
-	//temporary until I rewrite to work with
-	//membership types not groups
-	 if(count($user_groups) == 0){
-	   array_push($grouplist, -1);
-	 }
-	 
-	if($userID != 1 && $isAdmin != 1){
-    foreach($amount as &$priceSetSettings){
-      $optionList = &$priceSetSettings['options'];
-      foreach ($optionList as &$priceOption){
-        $acl = getAcl($priceOption['id']);
-        $match = FALSE; //assume nothing matches
-      	foreach($acl as $ace){
-				  if (!in_array($ace,$grouplist) && $match == FALSE){
-				      $optionList = array_diff_key($optionList,array($priceOption['id']=>1));
-				  }
-				  else {
-				    $match = TRUE;
-				  }
-      	}
-      }
+function memberprice_help($path, $arg) {
+    $output = '';
+    switch ($path) {
+    case "admin/help#memberpice":
+        $output = '<p>' . t("Adds ability to limit pricing option to members for Events") . '</p>';
+        break;
     }
-	}
+    return $output;
 }
 
-//Filter the price set to eliminate any price options
-//that user does not have access to based on group membership
-function memberprice_civicrm_buildPriceOptions( &$options ) {
-	require_once 'api/v2/GroupContact.php';
-	// get the logged in user id
-	$session =& CRM_Core_Session::singleton();
-	$userID  = $session->get( 'userID' );
-
-	if(!$userID){
-		$userID = -1;
-	}
-
-	//get the groups user belongs to
-	$params = array('contact_id' => $userID);
-	$user_groups = civicrm_group_contact_get( $params );
-	if ( civicrm_error ( $user_groups )) {
-		return $user_groups['error_message'];
-	}
-
-	$grouplist = array();
-	$isAdmin;
-	foreach($user_groups as $group) {
-	  array_push($grouplist, $group['id']);
-	  if($group['title'] == 'Administrators'){
-	    $isAdmin = 1;
-	  }
-	}
-	
-	//if it is not admin user
-	if($userID != 1 && $isAdmin != 1) {
-		foreach(array_keys($options) as $optionId) {
-			$acl = getAcl($optionId);
-			foreach($acl as $ace){
-				if (!in_array($ace,$user_groups)){
-					$options = array_diff_key($options,array($optionId=>1));
-				}
-			}
-		}
-	}
+/**
+ * Implements hook_perm
+ * This is a placeholder. Module does not currently
+ * need permissions to function
+ * 
+ * @return array list of permissions used by module
+ */
+function memberprice_perm() {
+    return array('access memberprice');
 }
+
+/**
+ * Implements hook civicrm_buildform
+ * adds acl list to the price options form
+ *
+ * @param string $formName  name of form passed by civicrm
+ * @param form $form reference to civicrm form object
+ */
+function memberprice_civicrm_buildForm($formName, &$form) {
+    civicrm_initialize();
+    require_once('api/v2/Group.php');
+    //only add group list to price option form
+    $action = $form->getVar('_action');
+    if ($formName == 'CRM_Price_Form_Option' && $action == CRM_Core_Action::UPDATE) {
+        //generate list of memberships to add to form
+        $group_list = getGroupList();
+        //get any acl's that already exist
+        $oid = $form->getElement('optionId')->getValue();
+        //no oid means this price option is being added
+        if ($oid) {
+            $groups_selected = getAcl($oid);
+        }
+        // set default values
+        $form->setDefaults(array('groups' => $groups_selected));
+        $form->add('select', 'groups', 'Groups', $group_list);
+        $element = $form->getElement('groups');
+        if (!$oid) {
+            $element->updateAttributes(array('disabled' => true));
+        }
+        $element->setMultiple(true);
+    }
+}
+
+/**
+ * Implements postProcess hook
+ * handles submission of custom form elements used to build the acl
+ * rebuilds the whole acl on submission
+ *
+ * @param string $formName name of form passed from civicrm
+ * @param form object $form reference to civicrm form object
+ *
+ */
+function memberprice_civicrm_postProcess($formName, &$form) {
+    $action = $form->getVar('_action');
+    if ($formName == 'CRM_Price_Form_Option' && $action == CRM_Core_Action::UPDATE) {
+        $price_option_id = $form->getElement('optionId')->getValue();
+        $acl_group_id = $form->getElement('groups')->getValue();
+        if ($price_option_id) {
+            //delete any records with this field id first
+            $delsql = "DELETE FROM civicrm_memberprice WHERE oid= %1";
+            $delparams = array(1 => array($price_option_id, 'Integer'));
+            CRM_Core_DAO::executeQuery($delsql, $delparams);
+            //if the acl is not set to Everyone
+            if ($acl_group_id[0] != '00') {
+                foreach ($acl_group_id as $acl_param) {
+                    //insert new records
+                    $sql = "INSERT INTO civicrm_memberprice (gid,oid) VALUES(%1,%2)";
+                    $params = array(1 => array($acl_param, 'Integer'), 2 => array($price_option_id, 'Integer'));
+                    CRM_Core_DAO::executeQuery($sql, $params);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Implements buildAmount hook
+ * replaces deprecated custom hook
+ * 
+ * Filter display of pricing options available
+ * to the currently logged in user based upon
+ * group membership
+ *
+ * @param $pageType string type of page (membership, event, custom, et al)
+ * @param $form form reference to the civicrm form object
+ * @param $amount array reference to the amount structure used to build form
+ *
+ */
+function memberprice_civicrm_buildAmount($pageType, &$form, &$amount) {
+    require_once 'api/v2/GroupContact.php';
+    // get the logged in user id
+    $session = &CRM_Core_Session::singleton();
+    $userID = $session->get('userID');
+    $grouplist = array();
+
+    if (!$userID) {
+        $userID = -1;
+        $grouplist[] = -1;
+    }
+    else {
+        //get the groups user belongs to
+        $params = array('contact_id' => $userID);
+        $user_groups = civicrm_group_contact_get($params);
+        if (civicrm_error($user_groups)) {
+            return $user_groups['error_message'];
+        }
+
+        //determine if this is an admin user
+        $isAdmin = 0;
+        foreach ($user_groups as $group) {
+            array_push($grouplist, $group['group_id']);
+            if ($group['title'] == 'Administrators') {
+                $isAdmin = 1;
+            }
+        }
+    }
+
+    //if contact doesn't belong to any groups
+    //they get non-member prices. This is 
+    //temporary until I rewrite to work with
+    //membership types not groups
+    if (count($user_groups) == 0) {
+        array_push($grouplist, -1);
+    }
+
+    if ($userID != 1 && $isAdmin != 1) {
+        foreach ($amount as &$priceSetSettings) {
+            $optionList = &$priceSetSettings['options'];
+            foreach ($optionList as &$priceOption) {
+                $acl = getAcl($priceOption['id']);
+                $match = FALSE; //assume nothing matches
+                foreach ($acl as $ace) {
+                    if (!in_array($ace, $grouplist) && $match == FALSE) {
+                        $optionList = array_diff_key($optionList, array($priceOption['id'] => 1));
+                    }
+                    else {
+                        $match = TRUE;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Implements buildPriceOptions custom hook
+ * replaced by buildAmount hook in civicrm 3.3+
+ * retained for backwards compatibility, will be removed in
+ * module release for v4
+ *  
+ * Filter display of pricing options available
+ * to the currently logged in user based upon
+ * group membership
+ * 
+ * @param array $options reference to price options that will be passed to the form
+ */
+function memberprice_civicrm_buildPriceOptions(&$options) {
+    require_once 'api/v2/GroupContact.php';
+    // get the logged in user id
+    $session = &CRM_Core_Session::singleton();
+    $userID = $session->get('userID');
+
+    if (!$userID) {
+        $userID = -1;
+    }
+
+    //get the groups user belongs to
+    $params = array('contact_id' => $userID);
+    $user_groups = civicrm_group_contact_get($params);
+    if (civicrm_error($user_groups)) {
+        return $user_groups['error_message'];
+    }
+
+    $grouplist = array();
+    $isAdmin;
+    foreach ($user_groups as $group) {
+        array_push($grouplist, $group['id']);
+        if ($group['title'] == 'Administrators') {
+            $isAdmin = 1;
+        }
+    }
+
+    //if it is not admin user
+    if ($userID != 1 && $isAdmin != 1) {
+        foreach (array_keys($options) as $optionId) {
+            $acl = getAcl($optionId);
+            foreach ($acl as $ace) {
+                if (!in_array($ace, $user_groups)) {
+                    $options = array_diff_key($options, array($optionId => 1));
+                }
+            }
+        }
+    }
+}
+
+//********************* Utility Functions *************************//
 
 /**
  * 
  * Provides list of groups from CiviCRM to the price options
  * form to be used in select list
  * 
- * returns array $grouplist
+ * @return array $grouplist
  */
-function getGroupList(){
-	$params = array();
-	$grouplist = array();
-	//default first entry in select list
-	$grouplist['00'] = 'Everyone';
-	$grouplist['-1'] = 'Non Members';
-	$myGroups =& civicrm_group_get($params);
-	foreach($myGroups as $group) {
-		$grouplist[$group['id']] = $group['title'];
-	}
-	return $grouplist;
+function getGroupList() {
+    $params = array();
+    $grouplist = array();
+    //default first entry in select list
+    $grouplist['00'] = 'Everyone';
+    $grouplist['-1'] = 'Non Members';
+    //passing empty array to group_get returns all groups
+    $myGroups = &civicrm_group_get($params);
+    foreach ($myGroups as $group) {
+        $grouplist[$group['id']] = $group['title'];
+    }
+    return $grouplist;
 }
 
-//retrieve list of groups allowed to access
-//the price option field.
-//if nothing is returned then all users
-//have access
-function getAcl($oid){
-	$aces = array();
-	$q = "SELECT gid FROM civicrm_memberprice WHERE oid = %1";
-	$params=array(1=>array($oid,'Integer'));
-	$dao = CRM_Core_DAO::executeQuery( $q, $params );
-	while($dao->fetch()){
-		array_push($aces, $dao->gid);
-	}
-	return $aces;
+/**
+ * Retrieve list of groups allowed to access
+ * the price option field.
+ * If nothing is returned then all users have access
+ * 
+ * @return array of access control entries
+ */
+function getAcl($oid) {
+    $aces = array();
+    $q = "SELECT gid FROM civicrm_memberprice WHERE oid = %1";
+    $params = array(1 => array($oid, 'Integer'));
+    $dao = CRM_Core_DAO::executeQuery($q, $params);
+    while ($dao->fetch()) {
+        array_push($aces, $dao->gid);
+    }
+    return $aces;
 }
 ?>
