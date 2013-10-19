@@ -6,7 +6,7 @@ function memberprice_install() {
     }
     //provides civicrm_error handling
     require_once('api/v2/utils.php');
-    $sql = "CREATE TABLE IF NOT EXISTS civicrm_memberprice (gid int, oid int);";
+    $sql = "CREATE TABLE IF NOT EXISTS civicrm_memberprice (mid int, oid int);";
     $result = CRM_Core_DAO::executeQuery($sql);
     if (civicrm_error($result)) {
       drupal_set_message($result['error_message']);

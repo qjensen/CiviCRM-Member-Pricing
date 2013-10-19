@@ -1,6 +1,6 @@
-; $Id$
-name = CiviCRM Members Only Event Pricing
-description = Adds ability to limit price options to members only
-core = 6.x
+name = MemberPrice
+description = Create price options that are available only to members
+core = 7.x
 package = CiviCRM
-dependencies[] = civicrm
+files[] = memberprice.install
+files[] = memberprice.module
